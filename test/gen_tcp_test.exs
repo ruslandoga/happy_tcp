@@ -1,4 +1,4 @@
-defmodule HappyTCPTest do
+defmodule GenTCPTest do
   use ExUnit.Case
 
   setup do

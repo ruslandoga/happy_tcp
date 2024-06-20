@@ -23,6 +23,9 @@ defmodule HappyTCP.MixProject do
 
   # Run "mix help deps" to learn about dependencies.
   defp deps do
-    []
+    [
+      {:mint, "~> 1.6", only: :test},
+      {:hackney, "~> 1.20", only: :test}
+    ]
   end
 end
