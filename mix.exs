@@ -1,11 +1,11 @@
-defmodule HappyTcp.MixProject do
+defmodule HappyTCP.MixProject do
   use Mix.Project
 
   def project do
     [
       app: :happy_tcp,
       version: "0.1.0",
-      elixir: "~> 1.17",
+      elixir: "~> 1.15",
       start_permanent: Mix.env() == :prod,
       deps: deps()
     ]
