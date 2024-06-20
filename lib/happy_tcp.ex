@@ -125,14 +125,6 @@ defmodule :happy_tcp do
   # Following functions have identical implementations in inet_tcp and inet6_tcp
   #
 
-  # none of these seem to be called by gen_tcp
-  def close(socket), do: :inet.tcp_close(socket)
-  def send(socket, packet, opts \\ []), do: :prim_inet.send(socket, packet, opts)
-  def recv(socket, length, timeout \\ -1), do: :prim_inet.recv(socket, length, timeout)
-  def unrecv(socket, data), do: :prim_inet.unrecv(socket, data)
-  def shutdown(socket, how), do: :prim_inet.shutdown(socket, how)
-  def controlling_process(socket, new_owner), do: :inet.tcp_controlling_process(socket, new_owner)
-
   def getserv(port_or_name), do: :inet_tcp.getserv(port_or_name)
 
   #
@@ -142,7 +134,11 @@ defmodule :happy_tcp do
   # doesn't seem to be called
   def family, do: __MODULE__
 
-  def mask({_, _, _, _} = mask, {_, _, _, _} = addr), do: :inet_tcp.mask(mask, addr)
+  def mask(mask, addr)
+
+  def mask({_, _, _, _} = mask, {_, _, _, _} = addr) do
+    :inet_tcp.mask(mask, addr)
+  end
 
   def mask({_, _, _, _, _, _, _, _} = mask, {_, _, _, _, _, _, _, _} = addr) do
     :inet6_tcp.mask(mask, addr)
@@ -155,15 +151,7 @@ defmodule :happy_tcp do
     end
   end
 
-  def translate_ip(ip), do: :inet6_tcp.translate_ip(ip)
-
-  # doesn't seem to be called
-  def accept(socket, timeout \\ :infinity) do
-    opts = [:tos, :ttl, :recvtos, :recvttl, :tclass, :recvtclass]
-
-    with {:ok, socket} = ok <- :prim_inet.accept(socket, timeout, opts) do
-      :inet_db.register_socket(socket, __MODULE__)
-      ok
-    end
+  def translate_ip(ip) do
+    :inet6_tcp.translate_ip(ip)
   end
 end
