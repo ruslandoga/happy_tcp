@@ -9,7 +9,39 @@ defmodule HappyTCPTest do
 
   # TODO :socket
 
-  test "it works" do
-    {:ok, _socket} = :gen_tcp.connect(~c"google.com", 80, active: false)
+  test "defaults to inet6" do
+    {:ok, listen_socket} = :gen_tcp.listen(0, [:binary, active: false])
+    {:ok, port} = :inet.port(listen_socket)
+
+    server =
+      Task.async(fn ->
+        {:ok, socket} = :gen_tcp.accept(listen_socket)
+        assert {:ok, {{0, 0, 0, 0, 0, 0, 0, 1}, _}} = :inet.peername(socket)
+        :gen_tcp.recv(socket, 0)
+      end)
+
+    {:ok, socket} = :gen_tcp.connect(~c"localhost", port, active: false)
+    assert {:ok, {{0, 0, 0, 0, 0, 0, 0, 1}, ^port}} = :inet.peername(socket)
+
+    :ok = :gen_tcp.send(socket, "hello, world!")
+    assert {:ok, "hello, world!"} = Task.await(server)
+  end
+
+  test "supports inet" do
+    {:ok, listen_socket} = :gen_tcp.listen(0, [:binary, :inet, active: false])
+    {:ok, port} = :inet.port(listen_socket)
+
+    server =
+      Task.async(fn ->
+        {:ok, socket} = :gen_tcp.accept(listen_socket)
+        assert {:ok, {{127, 0, 0, 1}, _}} = :inet.peername(socket)
+        :gen_tcp.recv(socket, 0)
+      end)
+
+    {:ok, socket} = :gen_tcp.connect(~c"localhost", port, active: false)
+    assert {:ok, {{127, 0, 0, 1}, ^port}} = :inet.peername(socket)
+
+    :ok = :gen_tcp.send(socket, "hello, world!")
+    assert {:ok, "hello, world!"} = Task.await(server)
   end
 end
