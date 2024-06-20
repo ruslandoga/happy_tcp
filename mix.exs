@@ -14,12 +14,18 @@ defmodule HappyTCP.MixProject do
   # Run "mix help compile.app" to learn about applications.
   def application do
     [
-      extra_applications: [:logger]
+      extra_applications: extra_applications(Mix.env())
     ]
   end
 
+  defp extra_applications(:test), do: [:logger, :ssl]
+  defp extra_applications(_env), do: [:logger]
+
   # Run "mix help deps" to learn about dependencies.
   defp deps do
-    []
+    [
+      {:mint, "~> 1.6", only: :test},
+      {:hackney, "~> 1.20", only: :test}
+    ]
   end
 end
