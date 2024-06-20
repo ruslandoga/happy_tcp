@@ -1,4 +1,4 @@
-# HappyTCP
+# Happy TCP
 
 Kind of like [yandex/inet64_tcp](https://github.com/yandex/inet64_tcp) but additionally implements [Happy Eyeballs](https://en.wikipedia.org/wiki/Happy_Eyeballs) [[1](https://datatracker.ietf.org/doc/html/rfc6555), [2](https://datatracker.ietf.org/doc/html/rfc8305), [3](https://datatracker.ietf.org/doc/draft-pauly-v6ops-happy-eyeballs-v3/)].
 
