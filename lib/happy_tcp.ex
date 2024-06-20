@@ -129,14 +129,6 @@ defmodule :happy_tcp do
   end
 
   # TODO when is it called?
-  def parse_address(host) do
-    case :inet_tcp.parse_address(host) do
-      {:ok, _addr} = ok -> ok
-      _ -> :inet6_tcp.parse_address(host)
-    end
-  end
-
-  # TODO when is it called?
   def translate_ip(ip) do
     :inet6_tcp.translate_ip(ip)
   end
