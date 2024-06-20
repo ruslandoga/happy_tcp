@@ -1,6 +1,6 @@
 # HappyTCP
 
-Kind of like https://github.com/yandex/inet64_tcp but adapts to some of the changes made to `inet_tcp` and `inet_tcp6` modules in the last eight years.
+Kind of like https://github.com/yandex/inet64_tcp but additionally implements [Happy Eyeballs.](https://datatracker.ietf.org/doc/html/rfc8305)
 
 ## Installation
 
@@ -13,6 +13,8 @@ end
 ```
 
 ## Usage
+
+The suggested way to use `happy_tcp` is to set it as the default `tcp_module` for all `gen_tcp` connections:
 
 ```elixir
 iex> default_tcp_module = :inet_db.tcp_module()
@@ -71,6 +73,32 @@ iex> :ssl.close(socket)
 iex> :inet_db.set_tcp_module(default_tcp_module)
 #==> :ok
 ```
+
+It can also be localized per connection:
+
+```elixir
+:gen_tcp.connect(~c"google.com", 80, tcp_module: :happy_tcp)
+```
+
+#### Mint
+
+```elixir
+Mint.HTTP.connect(:https, "google.com", 443, transport_opts: [tcp_module: :happy_tcp])
+```
+
+#### Finch
+
+```elixir
+{Finch, pools: %{default: [conn_opts: [transport_opts: [tcp_module: :happy_tcp]]]}}
+```
+
+#### httpc
+
+TODO
+
+#### Hackney
+
+TODO
 
 ## Notes
 

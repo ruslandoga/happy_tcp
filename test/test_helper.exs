@@ -1,4 +1,5 @@
 default_tcp_module = :inet_db.tcp_module()
+:inet.tcp_module()
 :ok = :inet_db.set_tcp_module(:happy_tcp)
 
 config =
