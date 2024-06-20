@@ -98,9 +98,8 @@ defmodule :happy_tcp do
   # Guess module by given options
   def listen(port, opts) do
     case get_specified_mod(opts) do
-      # By default listen IPv6, it will accept IPv4 connections too
-      nil -> :inet6_tcp.listen(port, opts)
-      mod -> mod.listen(port, opts)
+      :inet_tcp -> :inet_tcp.listen(port, opts)
+      _ -> :inet6_tcp.listen(port, opts)
     end
   end
 
@@ -126,18 +125,21 @@ defmodule :happy_tcp do
   # Following functions have identical implementations in inet_tcp and inet6_tcp
   #
 
+  # none of these seem to be called by gen_tcp
   def close(socket), do: :inet.tcp_close(socket)
   def send(socket, packet, opts \\ []), do: :prim_inet.send(socket, packet, opts)
   def recv(socket, length, timeout \\ -1), do: :prim_inet.recv(socket, length, timeout)
   def unrecv(socket, data), do: :prim_inet.unrecv(socket, data)
   def shutdown(socket, how), do: :prim_inet.shutdown(socket, how)
   def controlling_process(socket, new_owner), do: :inet.tcp_controlling_process(socket, new_owner)
+
   def getserv(port_or_name), do: :inet_tcp.getserv(port_or_name)
 
   #
   # new or changed functions (erlang 27.0, kernel-10.0)
   #
 
+  # doesn't seem to be called
   def family, do: __MODULE__
 
   def mask({_, _, _, _} = mask, {_, _, _, _} = addr), do: :inet_tcp.mask(mask, addr)
@@ -155,6 +157,7 @@ defmodule :happy_tcp do
 
   def translate_ip(ip), do: :inet6_tcp.translate_ip(ip)
 
+  # doesn't seem to be called
   def accept(socket, timeout \\ :infinity) do
     opts = [:tos, :ttl, :recvtos, :recvttl, :tclass, :recvtclass]
 
