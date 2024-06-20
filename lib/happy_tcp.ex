@@ -29,7 +29,6 @@ defmodule :happy_tcp do
     mod_by_addr(address)
   end
 
-  # TODO what if local?
   defp get_specified_mod([:inet | _]), do: :inet_tcp
   defp get_specified_mod([:inet6 | _]), do: :inet6_tcp
   defp get_specified_mod([{:ipv6_v6only, true} | _]), do: :inet6_tcp
@@ -125,14 +124,12 @@ defmodule :happy_tcp do
   # Following functions have identical implementations in inet_tcp and inet6_tcp
   #
 
-  def close(socket), do: :inet_tcp.close(socket)
-  def send(socket, packet, opts), do: :inet_tcp.send(socket, packet, opts)
-  def send(socket, packet), do: :inet_tcp.send(socket, packet)
-  def recv(socket, length), do: :inet_tcp.recv(socket, length)
-  def recv(socket, length, timeout), do: :inet_tcp.recv(socket, length, timeout)
-  def unrecv(socket, data), do: :inet_tcp.unrecv(socket, data)
-  def shutdown(socket, how), do: :inet_tcp.shutdown(socket, how)
-  def controlling_process(socket, new_owner), do: :inet_tcp.controlling_process(socket, new_owner)
+  def close(socket), do: :inet.tcp_close(socket)
+  def send(socket, packet, opts \\ []), do: :prim_inet.send(socket, packet, opts)
+  def recv(socket, length, timeout \\ -1), do: :prim_inet.recv(socket, length, timeout)
+  def unrecv(socket, data), do: :prim_inet.unrecv(socket, data)
+  def shutdown(socket, how), do: :prim_inet.shutdown(socket, how)
+  def controlling_process(socket, new_owner), do: :inet.tcp_controlling_process(socket, new_owner)
   def getserv(port_or_name), do: :inet_tcp.getserv(port_or_name)
 
   #
