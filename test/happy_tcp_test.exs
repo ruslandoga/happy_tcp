@@ -73,8 +73,14 @@ defmodule HappyTCPTest do
 
   @tag :ipv4_only
   test "connects to google.com over ipv4" do
-    {:ok, socket} = :gen_tcp.connect(~c"google.com", 80, [:binary, active: false])
-    on_exit(fn -> :gen_tcp.close(socket) end)
-    assert {:ok, {{_, _, _, _}, 80}} = :inet.peername(socket)
+    {:ok, socket} =
+      :ssl.connect(~c"google.com", 443, [
+        :binary,
+        active: false,
+        cacerts: :public_key.cacerts_get()
+      ])
+
+    on_exit(fn -> :ssl.close(socket) end)
+    assert {:ok, {{_, _, _, _}, 443}} = :ssl.peername(socket)
   end
 end
