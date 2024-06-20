@@ -3,8 +3,8 @@ defmodule HappyTCPTest do
 
   setup do
     :inet_tcp = :inet_db.tcp_module()
-    :inet_db.set_tcp_module(:happy_tcp)
-    on_exit(fn -> :inet_db.set_tcp_module(:inet_tcp) end)
+    :ok = :inet_db.set_tcp_module(:happy_tcp)
+    on_exit(fn -> :ok = :inet_db.set_tcp_module(:inet_tcp) end)
   end
 
   # TODO :socket
