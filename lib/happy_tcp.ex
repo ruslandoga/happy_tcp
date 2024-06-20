@@ -18,27 +18,20 @@ defmodule :happy_tcp do
   # https://github.com/erlang/otp/blob/master/lib/kernel/src/inet_tcp.erl
   # https://github.com/erlang/otp/blob/master/lib/kernel/src/inet6_tcp.erl
 
-  # determine a module by IP address tuple
   @spec mod_by_addr(:inet.ip_address()) :: :inet_tcp | :inet6_tcp
   defp mod_by_addr({_, _, _, _} = _ipv4), do: :inet_tcp
   defp mod_by_addr({_, _, _, _, _, _, _, _} = _ipv6), do: :inet6_tcp
 
-  # determine a module by socket options (may return nil)
   @spec get_specified_mod([:gen_tcp.option()]) :: :inet_tcp | :inet6_tcp | nil
   defp get_specified_mod([{addr_tag, address} | _]) when addr_tag in [:ip, :ifaddr] do
     mod_by_addr(address)
   end
 
-  # TODO these two are never called since :inet drops them before passing opts along
-  defp get_specified_mod([:inet | _]), do: :inet_tcp
-  defp get_specified_mod([:inet6 | _]), do: :inet6_tcp
-
   defp get_specified_mod([{:ipv6_v6only, true} | _]), do: :inet6_tcp
   defp get_specified_mod([_ | opts]), do: get_specified_mod(opts)
   defp get_specified_mod([]), do: nil
 
-  # When getting addresses, gather and intersperse responses from both inet and inet6 modules,
-  # but prefer inet6 over inet4
+  # TODO when is it called?
   def getaddr(address) do
     case :inet6_tcp.getaddr(address) do
       {:ok, _} = good_result -> good_result
@@ -81,8 +74,7 @@ defmodule :happy_tcp do
     [left, right | join_intersperse(rest_left, rest_right)]
   end
 
-  # Select module by given ip address tuple
-
+  # TODO cleanup
   def connect(address, port, opts) when is_integer(port) do
     mod_by_addr(address).connect(address, port, opts)
   end
@@ -95,7 +87,6 @@ defmodule :happy_tcp do
     mod_by_addr(address).connect(address, port, opts, timeout)
   end
 
-  # Guess module by given options
   def listen(port, opts) do
     case get_specified_mod(opts) do
       :inet_tcp -> :inet_tcp.listen(port, opts)
@@ -103,8 +94,7 @@ defmodule :happy_tcp do
     end
   end
 
-  # Guess module by given options, by default try inet6 first and on error try inet
-  # It's not good, but fdopen/2 seems to be unused by OTP, and third-party apps may specify the inet|inet6 option
+  # TODO when is it called?
   def fdopen(fd, opts) do
     case get_specified_mod(opts) do
       nil -> try_fdopen([:inet6_tcp, :inet_tcp], fd, opts, {:error, :einval})
@@ -121,19 +111,13 @@ defmodule :happy_tcp do
 
   defp try_fdopen([], _fd, _opts, error), do: error
 
-  #
-  # Following functions have identical implementations in inet_tcp and inet6_tcp
-  #
+  def getserv(port) when is_integer(port), do: {:ok, port}
+  def getserv(name) when is_atom(name), do: :inet.getservbyname(name, :tcp)
 
-  def getserv(port_or_name), do: :inet_tcp.getserv(port_or_name)
-
-  #
-  # new or changed functions (erlang 27.0, kernel-10.0)
-  #
-
-  # doesn't seem to be called
+  # TODO when is it called?
   def family, do: __MODULE__
 
+  # TODO when is it called?
   def mask(mask, addr)
 
   def mask({_, _, _, _} = mask, {_, _, _, _} = addr) do
@@ -144,6 +128,7 @@ defmodule :happy_tcp do
     :inet6_tcp.mask(mask, addr)
   end
 
+  # TODO when is it called?
   def parse_address(host) do
     case :inet_tcp.parse_address(host) do
       {:ok, _addr} = ok -> ok
@@ -151,6 +136,7 @@ defmodule :happy_tcp do
     end
   end
 
+  # TODO when is it called?
   def translate_ip(ip) do
     :inet6_tcp.translate_ip(ip)
   end
