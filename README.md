@@ -16,7 +16,7 @@ end
 
 ```elixir
 iex> default_tcp_module = :inet_db.tcp_module()
-#==> :inet
+#==> :inet_tcp
 iex> :inet_db.set_tcp_module(:happy_tcp)
 #==> :ok
 
@@ -96,7 +96,8 @@ iex> :happy_tcp.getaddrs(~c"google.com")
 ## TODOs
 
 - actually implement happy eyeballs
-- - can replace / inject a separate gen_tcp module the same way using `inet:gen_tcp_module` or can return a list of list from `:happy_tcp.getaddrs` :)
-- - instead of connecting to addrs [sequentially](https://github.com/erlang/otp/blob/OTP-27.0/lib/kernel/src/gen_tcp.erl#L585-L609), do the happy eyeballs thing and connect to ipv6, give it 300ms, and if by that time it's not connected, start ipv4 connection, then wait to whoever returns first, if none, go ahead through the ips
-- - "deep down" (gen_tcp -> inet_tcp -> prim_inet) gen_tcp.connect becomes [async](https://github.com/erlang/otp/blob/OTP-27.0/erts/preloaded/src/prim_inet.erl#L355-L411) so we can fire off a couple of them and wait for the first one and close (or cancel) the others
-- - if gen_tcp_socket backend is used, we can start multiple gen_statems
+  - can replace / inject a separate gen_tcp module the same way using `inet:gen_tcp_module` or can return a list of list from `:happy_tcp.getaddrs` :)
+  - instead of connecting to addrs [sequentially](https://github.com/erlang/otp/blob/OTP-27.0/lib/kernel/src/gen_tcp.erl#L585-L609), do the happy eyeballs thing and connect to ipv6, give it 300ms, and if by that time it's not connected, start ipv4 connection, then wait to whoever returns first, if none, go ahead through the ips
+  - "deep down" (gen_tcp -> inet_tcp -> prim_inet) gen_tcp.connect becomes [async](https://github.com/erlang/otp/blob/OTP-27.0/erts/preloaded/src/prim_inet.erl#L355-L411) so we can fire off a couple of them and wait for the first one and close (or cancel) the others
+  - if gen_tcp_socket backend is used, we can start multiple gen_statems
+- ensure [socket](https://www.erlang.org/doc/apps/kernel/socket.html) works too
