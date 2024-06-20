@@ -16,7 +16,7 @@ end
 
 ```elixir
 iex> default_tcp_module = :inet_db.tcp_module()
-#==> :inet
+#==> :inet_tcp
 iex> :inet_db.set_tcp_module(:happy_tcp)
 #==> :ok
 
