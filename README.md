@@ -1,6 +1,6 @@
 # HappyTCP
 
-Kind of like https://github.com/yandex/inet64_tcp but additionally implements [Happy Eyeballs.](https://datatracker.ietf.org/doc/html/rfc8305)
+Kind of like [yandex/inet64_tcp](https://github.com/yandex/inet64_tcp) but additionally implements [Happy Eyeballs.](https://datatracker.ietf.org/doc/html/rfc8305)
 
 ## Installation
 
