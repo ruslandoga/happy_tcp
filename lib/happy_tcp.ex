@@ -29,8 +29,10 @@ defmodule :happy_tcp do
     mod_by_addr(address)
   end
 
+  # TODO these two are never called since :inet drops them before passing opts along
   defp get_specified_mod([:inet | _]), do: :inet_tcp
   defp get_specified_mod([:inet6 | _]), do: :inet6_tcp
+
   defp get_specified_mod([{:ipv6_v6only, true} | _]), do: :inet6_tcp
   defp get_specified_mod([_ | opts]), do: get_specified_mod(opts)
   defp get_specified_mod([]), do: nil
