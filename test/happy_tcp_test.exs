@@ -14,20 +14,6 @@ defmodule HappyTCPTest do
   @ipv4_d {192, 0, 2, 4}
   @ipv4_e {192, 0, 2, 5}
 
-  @ipv6_available (case :inet6_tcp.listen(0, [
-                          {:ip, @ipv6_loopback},
-                          {:active, false}
-                        ]) do
-                     {:ok, socket} ->
-                       :ok = :inet6_tcp.close(socket)
-                       true
-
-                     {:error, _reason} ->
-                       false
-                   end)
-
-  @ipv6_skip if @ipv6_available, do: false, else: "IPv6 loopback is unavailable"
-
   test "getaddrs interleaves resolver order and appends either uneven tail" do
     install_test_hosts("""
     2001:db8::1 ipv6-long.invalid
@@ -148,7 +134,7 @@ defmodule HappyTCPTest do
     end)
   end
 
-  @tag skip: @ipv6_skip
+  @tag :ipv6
   test "gen_tcp sequentially falls through an immediate IPv6 failure to IPv4" do
     hostname = install_dual_stack_test_host()
 
@@ -221,7 +207,7 @@ defmodule HappyTCPTest do
     :ok = :gen_tcp.close(listener)
   end
 
-  @tag skip: @ipv6_skip
+  @tag :ipv6
   test "the last concrete bind option selects the IPv6 delegate" do
     assert {:ok, listener} =
              :gen_tcp.listen(0, [
@@ -236,7 +222,7 @@ defmodule HappyTCPTest do
     :ok = :gen_tcp.close(listener)
   end
 
-  @tag skip: @ipv6_skip
+  @tag :ipv6
   test "symbolic IP bind forms use the IPv6 default without crashing dispatch" do
     for address <- [:any, :loopback] do
       assert {:ok, listener} =
@@ -267,7 +253,7 @@ defmodule HappyTCPTest do
     end
   end
 
-  @tag skip: @ipv6_skip
+  @tag :ipv6
   test "IPv6 sockaddr map connect accepts symbolic addresses" do
     for address <- [:any, :loopback] do
       with_listener(:inet6_tcp, @ipv6_loopback, fn _listener, port ->
@@ -286,7 +272,7 @@ defmodule HappyTCPTest do
     exercise_accept(:inet_tcp, @ipv4_loopback)
   end
 
-  @tag skip: @ipv6_skip
+  @tag :ipv6
   test "accept callback dispatches to the IPv6 module" do
     exercise_accept(:inet6_tcp, @ipv6_loopback)
   end
