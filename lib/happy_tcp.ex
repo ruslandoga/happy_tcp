@@ -1,16 +1,25 @@
 defmodule :happy_tcp do
   @moduledoc """
-  Universal TCP driver for inet and inet6 address families.
+  `happy_tcp` is a dual-stack `tcp_module` adapter for Erlang/OTP's legacy
+  `inet` backend.
 
-  Based on https://github.com/yandex/inet64_tcp but updates to OPT-27 and intersperses IPv6 and IPv4
-  addresses for lookups and connection attempts instead of concating them, i.e.
+  `getaddrs/1` and `getaddrs/2` return `{:ok, [ip_address()]}` or
+  `{:error, reason}`. Successful lists contain ordinary numeric IP addresses:
+  IPv4 four-tuples and IPv6 eight-tuples. Numeric inputs are returned unchanged
+  as the sole list item. Resolver order is retained within each family while
+  the results are interleaved IPv6-first. If one family has more results, its
+  remaining addresses are appended. If only one lookup succeeds, that family's
+  addresses are returned; if both fail, the IPv6 lookup error is returned.
 
-      ["2404:6800:4003:c1c::66", "142.251.175.139", "2404:6800:4003:c1c::8a", "142.251.175.100", ...]
+  `gen_tcp` tries the returned addresses sequentially. Attempts are not raced
+  or staggered, so this is not complete RFC 8305 Happy Eyeballs. A slow or
+  black-holed candidate can consume the shared timeout before fallback occurs.
+  `getaddrs/2` passes the same OTP timer to both family lookups so resolution
+  also observes that single deadline.
 
-  instead of
-
-      ["2404:6800:4003:c1c::66",  "2404:6800:4003:c1c::8a", ..., "142.251.175.139", "142.251.175.100", ...]
-
+  Custom `tcp_module` integration is supported only with the legacy `inet`
+  backend. The `socket` backend and Erlang distribution are outside this
+  module's scope.
   """
 
   # relevant links
@@ -18,25 +27,42 @@ defmodule :happy_tcp do
   # https://github.com/erlang/otp/blob/master/lib/kernel/src/inet_tcp.erl
   # https://github.com/erlang/otp/blob/master/lib/kernel/src/inet6_tcp.erl
 
-  # determine a module by IP address tuple
+  # Determine a module by IP address tuple.
   @spec mod_by_addr(:inet.ip_address()) :: :inet_tcp | :inet6_tcp
   defp mod_by_addr({_, _, _, _} = _ipv4), do: :inet_tcp
   defp mod_by_addr({_, _, _, _, _, _, _, _} = _ipv6), do: :inet6_tcp
 
-  # determine a module by socket options (may return nil)
+  defp mod_by_sockaddr(%{addr: address}) when is_tuple(address), do: mod_by_addr(address)
+  defp mod_by_sockaddr(%{family: :inet}), do: :inet_tcp
+  defp mod_by_sockaddr(%{family: :inet6}), do: :inet6_tcp
+
+  # Determine a module by socket options (may return nil).
   @spec get_specified_mod([:gen_tcp.option()]) :: :inet_tcp | :inet6_tcp | nil
-  defp get_specified_mod([{addr_tag, address} | _]) when addr_tag in [:ip, :ifaddr] do
-    mod_by_addr(address)
+  defp get_specified_mod(opts), do: get_specified_mod(opts, nil)
+
+  defp get_specified_mod([{addr_tag, address} | opts], inferred_mod)
+       when addr_tag in [:ip, :ifaddr] do
+    get_specified_mod(opts, specified_mod_by_addr(address) || inferred_mod)
   end
 
-  defp get_specified_mod([:inet | _]), do: :inet_tcp
-  defp get_specified_mod([:inet6 | _]), do: :inet6_tcp
-  defp get_specified_mod([{:ipv6_v6only, true} | _]), do: :inet6_tcp
-  defp get_specified_mod([_ | opts]), do: get_specified_mod(opts)
-  defp get_specified_mod([]), do: nil
+  defp get_specified_mod([:inet | _], _inferred_mod), do: :inet_tcp
+  defp get_specified_mod([:inet6 | _], _inferred_mod), do: :inet6_tcp
 
-  # When getting addresses, gather and intersperse responses from both inet and inet6 modules,
-  # but prefer inet6 over inet4
+  defp get_specified_mod([{:ipv6_v6only, value} | _], _inferred_mod)
+       when is_boolean(value),
+       do: :inet6_tcp
+
+  defp get_specified_mod([_ | opts], inferred_mod), do: get_specified_mod(opts, inferred_mod)
+  defp get_specified_mod([], inferred_mod), do: inferred_mod
+
+  defp specified_mod_by_addr({_, _, _, _}), do: :inet_tcp
+  defp specified_mod_by_addr({_, _, _, _, _, _, _, _}), do: :inet6_tcp
+  defp specified_mod_by_addr(%{family: :inet}), do: :inet_tcp
+  defp specified_mod_by_addr(%{family: :inet6}), do: :inet6_tcp
+  defp specified_mod_by_addr(%{addr: address}), do: specified_mod_by_addr(address)
+  defp specified_mod_by_addr(_address), do: nil
+
+  # Prefer IPv6 for the single-address callback.
   def getaddr(address) do
     case :inet6_tcp.getaddr(address) do
       {:ok, _} = good_result -> good_result
@@ -63,47 +89,67 @@ defmodule :happy_tcp do
     merge_getaddrs_results(result6, result4)
   end
 
-  defp merge_getaddrs_results({:ok, addrs1}, {:ok, addrs2}) do
-    {:ok, join_intersperse(addrs1, addrs2)}
+  defp merge_getaddrs_results({:ok, ipv6_addresses}, {:ok, ipv4_addresses}) do
+    {:ok, interleave(ipv6_addresses, ipv4_addresses)}
   end
 
-  defp merge_getaddrs_results({:ok, addrs1}, _error2), do: {:ok, addrs1}
-  defp merge_getaddrs_results(_error1, {:ok, addrs2}), do: {:ok, addrs2}
-  defp merge_getaddrs_results(error1, _error2), do: error1
-
-  defp join_intersperse([], []), do: []
-  defp join_intersperse([], [_ | _] = right), do: right
-  defp join_intersperse([_ | _] = left, []), do: left
-
-  defp join_intersperse([left | rest_left], [right | rest_right]) do
-    [left, right | join_intersperse(rest_left, rest_right)]
+  defp merge_getaddrs_results({:ok, ipv6_addresses}, {:error, _reason}) do
+    {:ok, ipv6_addresses}
   end
 
-  # Select module by given ip address tuple
+  defp merge_getaddrs_results({:error, _reason}, {:ok, ipv4_addresses}) do
+    {:ok, ipv4_addresses}
+  end
+
+  # Prefer the first lookup's error so the failure policy does not depend on
+  # how much of the shared deadline remained for the IPv4 lookup.
+  defp merge_getaddrs_results(
+         {:error, _ipv6_reason} = ipv6_error,
+         {:error, _ipv4_reason}
+       ) do
+    ipv6_error
+  end
+
+  defp interleave([], ipv4_addresses), do: ipv4_addresses
+  defp interleave(ipv6_addresses, []), do: ipv6_addresses
+
+  defp interleave([ipv6 | rest_ipv6], [ipv4 | rest_ipv4]) do
+    [ipv6, ipv4 | interleave(rest_ipv6, rest_ipv4)]
+  end
+
+  # Select the delegate from the real numeric candidate supplied by gen_tcp.
 
   def connect(address, port, opts) when is_integer(port) do
     mod_by_addr(address).connect(address, port, opts)
   end
 
-  def connect(%{addr: address} = sock_addr, opts, time) do
-    mod_by_addr(address).connect(sock_addr, opts, time)
+  def connect(%{} = sock_addr, opts, time) do
+    mod = mod_by_sockaddr(sock_addr)
+    mod.connect(normalize_sockaddr(sock_addr, mod), opts, time)
   end
 
   def connect(address, port, opts, timeout) do
     mod_by_addr(address).connect(address, port, opts, timeout)
   end
 
-  # Guess module by given options
+  # Older OTP releases accept numeric sockaddr map destinations but not every
+  # symbolic form supported by newer releases.
+  defp normalize_sockaddr(%{addr: address} = sock_addr, mod)
+       when address in [:any, :loopback] do
+    %{sock_addr | addr: mod.translate_ip(address)}
+  end
+
+  defp normalize_sockaddr(sock_addr, _mod), do: sock_addr
+
+  # Guess a module from bind options, defaulting to IPv6.
   def listen(port, opts) do
     case get_specified_mod(opts) do
-      # By default listen IPv6, it will accept IPv4 connections too
       nil -> :inet6_tcp.listen(port, opts)
       mod -> mod.listen(port, opts)
     end
   end
 
-  # Guess module by given options, by default try inet6 first and on error try inet
-  # It's not good, but fdopen/2 seems to be unused by OTP, and third-party apps may specify the inet|inet6 option
+  # Guess a module by options; when unspecified, try IPv6 and then IPv4.
   def fdopen(fd, opts) do
     case get_specified_mod(opts) do
       nil -> try_fdopen([:inet6_tcp, :inet_tcp], fd, opts, {:error, :einval})
@@ -120,9 +166,8 @@ defmodule :happy_tcp do
 
   defp try_fdopen([], _fd, _opts, error), do: error
 
-  #
-  # Following functions have identical implementations in inet_tcp and inet6_tcp
-  #
+  # The following functions have identical implementations in inet_tcp and
+  # inet6_tcp.
 
   def close(socket), do: :inet.tcp_close(socket)
   def send(socket, packet, opts \\ []), do: :prim_inet.send(socket, packet, opts)
@@ -132,11 +177,10 @@ defmodule :happy_tcp do
   def controlling_process(socket, new_owner), do: :inet.tcp_controlling_process(socket, new_owner)
   def getserv(port_or_name), do: :inet_tcp.getserv(port_or_name)
 
-  #
-  # new or changed functions (erlang 27.0, kernel-10.0)
-  #
-
-  def family, do: __MODULE__
+  # IPv6 is the only valid family value consistent with this adapter's default.
+  # This callback exists for surface compatibility; happy_tcp is not a
+  # distribution driver.
+  def family, do: :inet6
 
   def mask({_, _, _, _} = mask, {_, _, _, _} = addr), do: :inet_tcp.mask(mask, addr)
 
@@ -154,11 +198,8 @@ defmodule :happy_tcp do
   def translate_ip(ip), do: :inet6_tcp.translate_ip(ip)
 
   def accept(socket, timeout \\ :infinity) do
-    opts = [:tos, :ttl, :recvtos, :recvttl, :tclass, :recvtclass]
-
-    with {:ok, socket} = ok <- :prim_inet.accept(socket, timeout, opts) do
-      :inet_db.register_socket(socket, __MODULE__)
-      ok
+    with {:ok, {address, _port}} <- :inet.sockname(socket) do
+      mod_by_addr(address).accept(socket, timeout)
     end
   end
 end
